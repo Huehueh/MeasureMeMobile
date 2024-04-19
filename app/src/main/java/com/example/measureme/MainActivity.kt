@@ -54,7 +54,10 @@ class MainActivity : ComponentActivity() {
     ) {
         NavHost(navController = navController, startDestination = MAIN_SCREEN) {
             composable(MAIN_SCREEN) {
-                Text("Hello Kinolo!")
+               MainScreen(
+                   sharingTargetViewModel = sharingTargetViewModel
+               )
+
             }
             composable(
                 route = "share_target_route",

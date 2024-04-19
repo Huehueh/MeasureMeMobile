@@ -4,24 +4,12 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Build.VERSION
-import android.os.Bundle
 import android.os.Parcelable
 import android.util.Log
 import androidx.compose.runtime.mutableStateOf
-import androidx.lifecycle.LifecycleObserver
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
-import androidx.navigation.NavController
-import dagger.assisted.Assisted
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import javax.inject.Inject
 
 @HiltViewModel
@@ -39,10 +27,32 @@ class SharingTargetViewModel @Inject constructor(
 //        )
 
     var image = mutableStateOf<Uri?>(null)
+    var corners = mutableStateOf(arrayOf<Point>())
+    var imageId = mutableStateOf("")
+
+//    var measurement = mutableStateOf(arrayOf<Point>())
+
+    var measurement: MutableList<Point> = ArrayList()
+
     fun setImage(str:Uri?) {
         image.value = str
         Log.i("SharingTargetViewModel", "setImage ${image.value}")
     }
+}
+typealias Point = Array<Int>
+typealias PointList = Array<Point>
+typealias PointList2 = MutableList<Point>
+
+fun PointList.display() : String {
+    var ret = ""
+    forEach { point ->
+        ret += "("
+        ret += point[0]
+        ret += ", "
+        ret += point[1]
+        ret += ")"
+    }
+    return ret
 }
 
 fun Intent.parseSharedContent() : Uri? {
