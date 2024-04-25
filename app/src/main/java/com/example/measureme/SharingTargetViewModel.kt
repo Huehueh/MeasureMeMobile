@@ -6,7 +6,9 @@ import android.os.Build
 import android.os.Build.VERSION
 import android.os.Parcelable
 import android.util.Log
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.geometry.Offset
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -25,14 +27,16 @@ class SharingTargetViewModel @Inject constructor(
 //            started = SharingStarted.WhileSubscribed(5_000),
 //            initialValue = ""
 //        )
-
+    var serverAddress = mutableStateOf("http://192.168.1.22:8080/")
     var image = mutableStateOf<Uri?>(null)
-    var corners = mutableStateOf(arrayOf<Point>())
+    var corners: MutableList<Point> = ArrayList()
+    var imageMeasured = mutableStateOf(false)
     var imageId = mutableStateOf("")
+    var vector: MutableList<Point> = ArrayList()
+    var measurement = mutableStateOf(0f)
 
-//    var measurement = mutableStateOf(arrayOf<Point>())
-
-    var measurement: MutableList<Point> = ArrayList()
+    var startPoint :MutableState<Point?> = mutableStateOf(null)
+    var endPoint :MutableState<Point?> = mutableStateOf(null)
 
     fun setImage(str:Uri?) {
         image.value = str
@@ -40,8 +44,7 @@ class SharingTargetViewModel @Inject constructor(
     }
 }
 typealias Point = Array<Int>
-typealias PointList = Array<Point>
-typealias PointList2 = MutableList<Point>
+typealias PointList = MutableList<Point>
 
 fun PointList.display() : String {
     var ret = ""
@@ -53,6 +56,10 @@ fun PointList.display() : String {
         ret += ")"
     }
     return ret
+}
+
+fun Point.toOffset() : Offset {
+    return Offset(this[0].toFloat(), this[1].toFloat())
 }
 
 fun Intent.parseSharedContent() : Uri? {

@@ -9,20 +9,20 @@ data class UploadResponse(
     val corners: PointList,
     val id: String
 ) {
-    override fun equals(other: Any?): Boolean {
-        if (this === other) return true
-        if (javaClass != other?.javaClass) return false
-
-        other as UploadResponse
-
-        if (!corners.contentDeepEquals(other.corners)) return false
-
-        return true
-    }
-
-    override fun hashCode(): Int {
-        return corners.contentDeepHashCode()
-    }
+//    override fun equals(other: Any?): Boolean {
+//        if (this === other) return true
+//        if (javaClass != other?.javaClass) return false
+//
+//        other as UploadResponse
+//
+//        if (!corners.contentDeepEquals(other.corners)) return false
+//
+//        return true
+//    }
+//
+//    override fun hashCode(): Int {
+//        return corners.contentDeepHashCode()
+//    }
 }
 
 data class MeasureResponse(
@@ -32,7 +32,7 @@ data class MeasureResponse(
 }
 data class ImageMeasurement (
     val id: String,
-    val coordinates: PointList2
+    val coordinates: PointList
 )
 
 interface ApiService {
