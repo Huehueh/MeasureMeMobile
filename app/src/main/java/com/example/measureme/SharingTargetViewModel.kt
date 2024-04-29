@@ -38,6 +38,15 @@ class SharingTargetViewModel @Inject constructor(
     var startPoint :MutableState<Point?> = mutableStateOf(null)
     var endPoint :MutableState<Point?> = mutableStateOf(null)
 
+    enum class ImageResult {
+        NOT_SEND,
+        A4_FOUND,
+        A4_NOT_FOUND,
+        UNKNOWN
+    }
+    var imageResult:MutableState<ImageResult> = mutableStateOf(ImageResult.UNKNOWN)
+    var showPopup = mutableStateOf(false)
+
     fun setImage(str:Uri?) {
         image.value = str
         Log.i("SharingTargetViewModel", "setImage ${image.value}")

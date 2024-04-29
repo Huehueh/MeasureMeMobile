@@ -4,24 +4,31 @@ import android.content.Context
 import android.graphics.ImageDecoder
 import android.net.Uri
 import android.util.Log
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupProperties
 import coil.compose.AsyncImage
 
 var TAG: String = "ImageUpload"
@@ -41,7 +48,11 @@ fun ImageUploadFragment(sharingTargetViewModel: SharingTargetViewModel) {
         }
         val pointConverter = PointConverter(bitmap.width, bitmap.height)
 
-        Column() {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+        ) {
             Text(text = "Size ${bitmap.width} ${bitmap.height}")
             Box(modifier = Modifier.fillMaxWidth()) {
                 AsyncImage(
@@ -49,36 +60,38 @@ fun ImageUploadFragment(sharingTargetViewModel: SharingTargetViewModel) {
                     contentDescription = "taki obrazek",
                     modifier = Modifier
                         .pointerInput(Unit) {
-                            detectDragGestures(
-                                onDragStart = {
-                                    var point = arrayOf<Int>(it.x.toInt(), it.y.toInt())
-                                    Log.i(TAG, "DRAG START ${point[0]}, ${point[1]}")
-                                    sharingTargetViewModel.startPoint.value = point
-                                },
-                                onDrag = { pointerInputChange, _ ->
-                                    Log.i(TAG, "DRAG ${pointerInputChange.position}")
-                                    var point = arrayOf<Int>(
-                                        pointerInputChange.position.x.toInt(),
-                                        pointerInputChange.position.y.toInt()
-                                    )
-                                    sharingTargetViewModel.endPoint.value = point
-                                },
-                                onDragEnd = {
-                                    sharingTargetViewModel.let {
-                                        if (it.startPoint.value != null && it.endPoint.value != null) {
-                                            it.vector = ArrayList()
-                                            it.vector += pointConverter.getImagePosition(it.startPoint.value!!)
-                                            it.vector += pointConverter.getImagePosition(it.endPoint.value!!)
-                                            if (sharingTargetViewModel.imageMeasured.value) {
-                                                connHandler.sendMeasurement(
-                                                    it.vector,
-                                                    it.imageId.value
-                                                )
+                            if (sharingTargetViewModel.imageResult.value == SharingTargetViewModel.ImageResult.A4_FOUND) {
+                                detectDragGestures(
+                                    onDragStart = {
+                                        val point = arrayOf<Int>(it.x.toInt(), it.y.toInt())
+                                        Log.i(TAG, "DRAG START ${point[0]}, ${point[1]}")
+                                        sharingTargetViewModel.startPoint.value = point
+                                    },
+                                    onDrag = { pointerInputChange, _ ->
+                                        Log.i(TAG, "DRAG ${pointerInputChange.position}")
+                                        val point = arrayOf<Int>(
+                                            pointerInputChange.position.x.toInt(),
+                                            pointerInputChange.position.y.toInt()
+                                        )
+                                        sharingTargetViewModel.endPoint.value = point
+                                    },
+                                    onDragEnd = {
+                                        sharingTargetViewModel.let {
+                                            if (it.startPoint.value != null && it.endPoint.value != null) {
+                                                it.vector = ArrayList()
+                                                it.vector += pointConverter.getImagePosition(it.startPoint.value!!)
+                                                it.vector += pointConverter.getImagePosition(it.endPoint.value!!)
+                                                if (sharingTargetViewModel.imageMeasured.value) {
+                                                    connHandler.sendMeasurement(
+                                                        it.vector,
+                                                        it.imageId.value
+                                                    )
+                                                }
                                             }
                                         }
                                     }
-
-                                })
+                                )
+                            }
                         }
                         .drawWithContent {
                             drawContent()
@@ -121,10 +134,53 @@ fun ImageUploadFragment(sharingTargetViewModel: SharingTargetViewModel) {
 
             
             Text(text = "Zmierzono ${sharingTargetViewModel.measurement.value} cm")
+            
+            if(sharingTargetViewModel.showPopup.value)
+            {
+                MyPopup(imageResult = sharingTargetViewModel.imageResult.value) {
+                    sharingTargetViewModel.showPopup.value = false
+                }
+            }
         }
     }
+}
 
-
+@Composable
+fun MyPopup(imageResult: SharingTargetViewModel.ImageResult, onDismiss:() -> Unit) {
+    Popup(
+        alignment = Alignment.Center,
+        properties = PopupProperties(
+            excludeFromSystemGesture = true
+        ),
+        onDismissRequest = onDismiss
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(fraction = 0.8f)
+                .background(Color.White)
+                .clip(RoundedCornerShape(4.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                modifier = Modifier
+//                    .fillMaxSize()
+                    .align(Alignment.Center),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                when(imageResult)
+                {
+                    SharingTargetViewModel.ImageResult.A4_FOUND -> Text(text = "Obrazek dotarł! \n Kartka znaleziona!")
+                    SharingTargetViewModel.ImageResult.A4_NOT_FOUND -> Text(text = "Obrazek dotarł! \n Kartka nie znaleziona:(")
+                    SharingTargetViewModel.ImageResult.NOT_SEND -> Text(text = "Obrazek z jakiegoś powodu nie został wysłany:(")
+                    else -> {Text(text = "Co to sie porobiło!")}
+                }
+                Button(onClick = onDismiss) {
+                    Text(text = "OK")
+                }
+            }
+        }
+    }
 }
 
 fun getFilePath(uri: Uri, context: Context) : String{

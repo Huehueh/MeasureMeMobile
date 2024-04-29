@@ -71,22 +71,26 @@ class ConnectionHandler(val sharingTargetViewModel: SharingTargetViewModel) {
                         sharingTargetViewModel.imageMeasured.value = true
                         sharingTargetViewModel.startPoint.value = null
                         sharingTargetViewModel.endPoint.value = null
+                        sharingTargetViewModel.imageResult.value = SharingTargetViewModel.ImageResult.A4_FOUND
 
                         Log.i(TAG, "CORNERS ${sharingTargetViewModel.corners.size}")
                     }
 
                 } else {
                     // Image upload failed, handle the error
-
+                    sharingTargetViewModel.imageResult.value = SharingTargetViewModel.ImageResult.NOT_SEND
                     Log.i(TAG, "response not successful")
                 }
             }
             catch (e: ConnectException) {
+                sharingTargetViewModel.imageResult.value = SharingTargetViewModel.ImageResult.NOT_SEND
                 Log.e(TAG, "ConnectException")
             }
             catch (e: SocketTimeoutException) {
+                sharingTargetViewModel.imageResult.value = SharingTargetViewModel.ImageResult.NOT_SEND
                 Log.e(TAG, "SocketTimeoutException")
             }
+            sharingTargetViewModel.showPopup.value = true
         }
     }
 
