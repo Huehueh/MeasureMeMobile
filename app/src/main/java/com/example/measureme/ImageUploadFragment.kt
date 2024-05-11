@@ -1,6 +1,6 @@
 package com.example.measureme
 
-import android.content.Context
+import android.content.ContentResolver
 import android.graphics.ImageDecoder
 import android.net.Uri
 import android.util.Log
@@ -17,6 +17,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -26,119 +28,97 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
 import coil.compose.AsyncImage
+import kotlinx.coroutines.flow.collectLatest
 
 var TAG: String = "ImageUpload"
 
+fun createPointConverter(imageUri: Uri, contentResolver: ContentResolver) : PointConverter {
+    val src = ImageDecoder.createSource(contentResolver, imageUri)
+    val bitmap = ImageDecoder.decodeBitmap(
+        src
+    ) { decoder, _, _ ->
+        decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+        decoder.isMutableRequired = true
+    }
+    return PointConverter(bitmap.width, bitmap.height)
+}
+
+
 @Composable
-fun ImageUploadFragment(sharingTargetViewModel: SharingTargetViewModel) {
+fun ImageUploadFragment(imageMeasureViewModel: ImageMeasureViewModel) {
+
+    LaunchedEffect(Unit) {
+        snapshotFlow { imageMeasureViewModel.imageUri.value }
+            .collectLatest {
+                Log.i(TAG, "AAAAAAAAAAAAAAAAAA NOWY OBRAZEK")
+                imageMeasureViewModel.imageResult.value = ImageResult.NOT_SEND
+            }
+    }
     val context = LocalContext.current
-    val connHandler = ConnectionHandler(sharingTargetViewModel)
-    sharingTargetViewModel.image.value?.let { selectedImageUri ->
+    imageMeasureViewModel.imageUri.value?.let { selectedImageUri ->
         Log.i(TAG, "Displaying $selectedImageUri")
-        val src = ImageDecoder.createSource(context.contentResolver, selectedImageUri)
-        val bitmap = ImageDecoder.decodeBitmap(
-                src
-        ) { decoder, _, _ ->
-            decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
-            decoder.isMutableRequired = true
-        }
-        val pointConverter = PointConverter(bitmap.width, bitmap.height)
+
+        val pointConverter = createPointConverter(selectedImageUri, context.contentResolver)
 
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
         ) {
-            Text(text = "Size ${bitmap.width} ${bitmap.height}")
             Box(modifier = Modifier.fillMaxWidth()) {
                 AsyncImage(
                     model = selectedImageUri.toString(),
                     contentDescription = "taki obrazek",
                     modifier = Modifier
-                        .pointerInput(Unit) {
-                            if (sharingTargetViewModel.imageResult.value == SharingTargetViewModel.ImageResult.A4_FOUND) {
-                                detectDragGestures(
-                                    onDragStart = {
-                                        val point = arrayOf<Int>(it.x.toInt(), it.y.toInt())
-                                        Log.i(TAG, "DRAG START ${point[0]}, ${point[1]}")
-                                        sharingTargetViewModel.startPoint.value = point
-                                    },
-                                    onDrag = { pointerInputChange, _ ->
-                                        Log.i(TAG, "DRAG ${pointerInputChange.position}")
-                                        val point = arrayOf<Int>(
-                                            pointerInputChange.position.x.toInt(),
-                                            pointerInputChange.position.y.toInt()
-                                        )
-                                        sharingTargetViewModel.endPoint.value = point
-                                    },
-                                    onDragEnd = {
-                                        sharingTargetViewModel.let {
-                                            if (it.startPoint.value != null && it.endPoint.value != null) {
-                                                it.vector = ArrayList()
-                                                it.vector += pointConverter.getImagePosition(it.startPoint.value!!)
-                                                it.vector += pointConverter.getImagePosition(it.endPoint.value!!)
-                                                if (sharingTargetViewModel.imageMeasured.value) {
-                                                    connHandler.sendMeasurement(
-                                                        it.vector,
-                                                        it.imageId.value
-                                                    )
-                                                }
-                                            }
-                                        }
-                                    }
-                                )
-                            }
+                        .measureOnDrag(imageMeasureViewModel, pointConverter)
+                        .drawMeasurement(
+                            imageMeasureViewModel.startPoint.value,
+                            imageMeasureViewModel.endPoint.value
+                        )
+                        .onSizeChanged { imageSize ->
+                            pointConverter.setDisplaySize(imageSize.width, imageSize.height)
                         }
-                        .drawWithContent {
-                            drawContent()
-                            sharingTargetViewModel.let {
-                                Log.i(TAG, "AAAAAAAAAAAAAAAAAA ${it.corners.size}")
-                                it.corners.forEach { point ->
-                                    val displayPoint = pointConverter.getDisplayPosition(point)
-                                    drawCircle(
-                                        Color.Red,
-                                        5f,
-                                        Offset(displayPoint[0].toFloat(), displayPoint[1].toFloat())
-                                    )
-                                }
-                                if (it.startPoint.value != null && it.endPoint.value != null) {
-                                    drawCircle(Color.Blue, 15f, it.startPoint.value!!.toOffset())
-                                    drawCircle(Color.Blue, 15f, it.endPoint.value!!.toOffset())
-                                    drawLine(
-                                        Color.Blue,
-                                        it.startPoint.value!!.toOffset(),
-                                        it.endPoint.value!!.toOffset(),
-                                        5.0f
-                                    )
-                                }
-
-                            }
-                        }
-                        .onSizeChanged {
-                            pointConverter.setDisplaySize(it.width, it.height)
-                        }
+                        .drawCorners(
+                            imageMeasureViewModel.corners as ArrayList<Point>,
+                            pointConverter
+                        )
                 )
             }
-            Text(text = "Corners ${sharingTargetViewModel.corners.size} ${sharingTargetViewModel.corners.display()}")
+            Text(text = "Corners ${imageMeasureViewModel.corners.size} ${imageMeasureViewModel.corners.display()}")
 
-            Button(onClick = {
-                connHandler.sendImage(selectedImageUri, context)
-            }) {
-                Text(text = "Measure me!")
+            when(imageMeasureViewModel.imageResult.value) {
+                ImageResult.NOT_SEND -> {
+                    Button(onClick = { imageMeasureViewModel.sendImage(selectedImageUri, context) }
+                    ) {
+                        Text(text = "Wyślij zdjęcie!")
+                    }
+                }
+                ImageResult.A4_FOUND -> {
+                    Text(
+                        text = "Zdjecie wysłano. Kartka znaleziona!",
+                        modifier = Modifier.background(Color.Green)
+                    )
+                }
+                ImageResult.A4_NOT_FOUND -> {
+                    Text(
+                        text = "Zdjecie wysłano. Kartka nie znaleziona!",
+                        modifier = Modifier.background(Color.Red)
+                    )
+                }
+
+                else -> {}
             }
-
-
+            Text(text = "Zmierzono ${imageMeasureViewModel.measurementCm.value} cm")
             
-            Text(text = "Zmierzono ${sharingTargetViewModel.measurement.value} cm")
-            
-            if(sharingTargetViewModel.showPopup.value)
+            if(imageMeasureViewModel.showPopup.value)
             {
-                MyPopup(imageResult = sharingTargetViewModel.imageResult.value) {
-                    sharingTargetViewModel.showPopup.value = false
+                MyPopup(imageResult = imageMeasureViewModel.imageResult.value) {
+                    imageMeasureViewModel.showPopup.value = false
                 }
             }
         }
@@ -146,7 +126,7 @@ fun ImageUploadFragment(sharingTargetViewModel: SharingTargetViewModel) {
 }
 
 @Composable
-fun MyPopup(imageResult: SharingTargetViewModel.ImageResult, onDismiss:() -> Unit) {
+fun MyPopup(imageResult: ImageResult, onDismiss:() -> Unit) {
     Popup(
         alignment = Alignment.Center,
         properties = PopupProperties(
@@ -157,22 +137,21 @@ fun MyPopup(imageResult: SharingTargetViewModel.ImageResult, onDismiss:() -> Uni
         Box(
             modifier = Modifier
                 .fillMaxWidth(fraction = 0.8f)
-                .background(Color.White)
-                .clip(RoundedCornerShape(4.dp)),
+                .background(Color.Green)
+                .clip(RoundedCornerShape(8.dp)),
             contentAlignment = Alignment.Center
         ) {
             Column(
                 modifier = Modifier
-//                    .fillMaxSize()
                     .align(Alignment.Center),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
                 when(imageResult)
                 {
-                    SharingTargetViewModel.ImageResult.A4_FOUND -> Text(text = "Obrazek dotarł! \n Kartka znaleziona!")
-                    SharingTargetViewModel.ImageResult.A4_NOT_FOUND -> Text(text = "Obrazek dotarł! \n Kartka nie znaleziona:(")
-                    SharingTargetViewModel.ImageResult.NOT_SEND -> Text(text = "Obrazek z jakiegoś powodu nie został wysłany:(")
+                    ImageResult.A4_FOUND -> Text(text = "Obrazek dotarł! \n Kartka znaleziona!")
+                    ImageResult.A4_NOT_FOUND -> Text(text = "Obrazek dotarł! \n Kartka nie znaleziona:(")
+                    ImageResult.NOT_SEND -> Text(text = "Obrazek z jakiegoś powodu nie został wysłany:(")
                     else -> {Text(text = "Co to sie porobiło!")}
                 }
                 Button(onClick = onDismiss) {
@@ -183,14 +162,6 @@ fun MyPopup(imageResult: SharingTargetViewModel.ImageResult, onDismiss:() -> Uni
     }
 }
 
-fun getFilePath(uri: Uri, context: Context) : String{
-    val filePathHelper = FilePathHelper()
-    var path = if (filePathHelper.getPathnew(uri, context) != null) {
-        filePathHelper.getPathnew(uri, context).lowercase();
-    } else {
-        filePathHelper.getFilePathFromURI(uri, context).lowercase();
-    }
-    return path
-}
+
 
 

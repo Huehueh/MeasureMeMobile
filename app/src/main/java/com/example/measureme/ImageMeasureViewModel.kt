@@ -1,5 +1,6 @@
 package com.example.measureme
 
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -8,14 +9,23 @@ import android.os.Parcelable
 import android.util.Log
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.geometry.Offset
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.onEach
 import javax.inject.Inject
 
+enum class ImageResult {
+    NOT_SEND,
+    A4_FOUND,
+    A4_NOT_FOUND,
+    NO_PICTURE
+}
+
 @HiltViewModel
-class SharingTargetViewModel @Inject constructor(
+class ImageMeasureViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle
 ) :ViewModel() {
 
@@ -27,29 +37,39 @@ class SharingTargetViewModel @Inject constructor(
 //            started = SharingStarted.WhileSubscribed(5_000),
 //            initialValue = ""
 //        )
-    var serverAddress = mutableStateOf("http://192.168.1.22:8080/")
-    var image = mutableStateOf<Uri?>(null)
+
+
+    //    val serverAddress: String = "http://192.168.1.87:8080/"
+//    val serverAddress: String = "http://192.168.1.22:8080/"
+    var serverAddress = "https://plac.dynu.net/"
+    lateinit var connHandler: ConnectionHandler
+    var imageUri = mutableStateOf<Uri?>(null)
+    var imageResult:MutableState<ImageResult> = mutableStateOf(ImageResult.NO_PICTURE)
+
+    // image data
     var corners: MutableList<Point> = ArrayList()
-    var imageMeasured = mutableStateOf(false)
     var imageId = mutableStateOf("")
-    var vector: MutableList<Point> = ArrayList()
-    var measurement = mutableStateOf(0f)
+    var measurementCm = mutableStateOf(0f) // in cm
 
     var startPoint :MutableState<Point?> = mutableStateOf(null)
     var endPoint :MutableState<Point?> = mutableStateOf(null)
-
-    enum class ImageResult {
-        NOT_SEND,
-        A4_FOUND,
-        A4_NOT_FOUND,
-        UNKNOWN
-    }
-    var imageResult:MutableState<ImageResult> = mutableStateOf(ImageResult.UNKNOWN)
+    
+    // UI
     var showPopup = mutableStateOf(false)
 
-    fun setImage(str:Uri?) {
-        image.value = str
-        Log.i("SharingTargetViewModel", "setImage ${image.value}")
+    fun sendImage(uri: Uri, context: Context) {
+        if(!this::connHandler.isInitialized) {
+            connHandler = ConnectionHandler(serverAddress, this)
+        }
+        connHandler.sendImage(uri, context)
+    }
+
+    fun measureFromStartToEndPoint() {
+        if(!this::connHandler.isInitialized) {
+            return
+        }
+        val points: PointList = arrayListOf(startPoint.value!!, endPoint.value!!)
+        connHandler.sendMeasurement(points, imageId.value)
     }
 }
 typealias Point = Array<Int>

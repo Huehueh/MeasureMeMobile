@@ -3,7 +3,9 @@ package com.example.measureme
 import android.content.Context
 import android.net.Uri
 import android.util.Log
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
@@ -17,10 +19,7 @@ import java.net.ConnectException
 import java.net.SocketTimeoutException
 import java.util.concurrent.TimeUnit
 
-class ConnectionHandler(val sharingTargetViewModel: SharingTargetViewModel) {
-
-//    val serverAddress: String = "http://192.168.1.87:8080/"
-//    val serverAddress: String = "http://192.168.1.22:8080/"
+class ConnectionHandler(private val serverAddress: String, private val imageMeasureViewModel: ImageMeasureViewModel) {
 
     private val okHttpClient = OkHttpClient.Builder()
         .connectTimeout(1, TimeUnit.MINUTES)
@@ -29,23 +28,31 @@ class ConnectionHandler(val sharingTargetViewModel: SharingTargetViewModel) {
         .build()
 
     private val api: ApiService = Retrofit.Builder()
-        .baseUrl(sharingTargetViewModel.serverAddress.value)
+        .baseUrl(serverAddress)
         .client(okHttpClient)
         .addConverterFactory(GsonConverterFactory.create())
         .build()
         .create(ApiService::class.java)
 
+    val coroutineExceptionHandler = CoroutineExceptionHandler(){_, throwable ->
+        throwable.printStackTrace()
+    }
+
+    init {
+        Log.i(TAG, "STARTED")
+    }
+
     @OptIn(DelicateCoroutinesApi::class)
     fun sendMeasurement(pointList: PointList, imageId: String)
     {
-        GlobalScope.launch {
+        GlobalScope.launch(Dispatchers.IO + coroutineExceptionHandler) {
             Log.i(TAG, "wysylam $imageId points $pointList")
             val h = ImageMeasurement(imageId, pointList)
             val response = api.measure(h)
             if (response.isSuccessful) {
                 Log.i(TAG, "HUEHUEHUHEUHHEUHEUHEUEH")
                 response.body()?.let {
-                    sharingTargetViewModel.measurement.value = it.measurement
+                    imageMeasureViewModel.measurementCm.value = it.measurement
                 }
             }
         }
@@ -53,7 +60,6 @@ class ConnectionHandler(val sharingTargetViewModel: SharingTargetViewModel) {
 
     @OptIn(DelicateCoroutinesApi::class)
     fun sendImage(file: File) {
-
         val requestFile = file.asRequestBody("image/*".toMediaTypeOrNull())
         val imagePart = MultipartBody.Part.createFormData(
             "image",
@@ -63,34 +69,34 @@ class ConnectionHandler(val sharingTargetViewModel: SharingTargetViewModel) {
         GlobalScope.launch {
             try {
                 val response = api.uploadImage(imagePart)
-                Log.i(TAG, "Sending image ${file.path}, response ${response.isSuccessful} corners ${response.body()!!.corners.display()}")
+                val corners = if (response.isSuccessful) response.body()!!.corners.display() else "NO CORNERS"
+                Log.i(TAG, "Sending image ${file.path}, response $corners")
                 if (response.isSuccessful) {
                     response.body()?.let {
-                        sharingTargetViewModel.corners = it.corners
-                        sharingTargetViewModel.imageId.value = it.id
-                        sharingTargetViewModel.imageMeasured.value = true
-                        sharingTargetViewModel.startPoint.value = null
-                        sharingTargetViewModel.endPoint.value = null
-                        sharingTargetViewModel.imageResult.value = SharingTargetViewModel.ImageResult.A4_FOUND
+                        imageMeasureViewModel.corners = it.corners
+                        imageMeasureViewModel.imageId.value = it.id
+                        imageMeasureViewModel.startPoint.value = null
+                        imageMeasureViewModel.endPoint.value = null
+                        imageMeasureViewModel.imageResult.value = ImageResult.A4_FOUND
 
-                        Log.i(TAG, "CORNERS ${sharingTargetViewModel.corners.size}")
+                        Log.i(TAG, "CORNERS ${imageMeasureViewModel.corners.size}")
                     }
 
                 } else {
                     // Image upload failed, handle the error
-                    sharingTargetViewModel.imageResult.value = SharingTargetViewModel.ImageResult.NOT_SEND
-                    Log.i(TAG, "response not successful")
+                    imageMeasureViewModel.imageResult.value = ImageResult.NOT_SEND // TODO: INNY STAN
+                    Log.i(TAG, "a4 not found ${response.code()}")
                 }
             }
             catch (e: ConnectException) {
-                sharingTargetViewModel.imageResult.value = SharingTargetViewModel.ImageResult.NOT_SEND
-                Log.e(TAG, "ConnectException")
+                imageMeasureViewModel.imageResult.value = ImageResult.NOT_SEND
+                Log.e(TAG, "ConnectException $e")
             }
             catch (e: SocketTimeoutException) {
-                sharingTargetViewModel.imageResult.value = SharingTargetViewModel.ImageResult.NOT_SEND
-                Log.e(TAG, "SocketTimeoutException")
+                imageMeasureViewModel.imageResult.value = ImageResult.NOT_SEND
+                Log.e(TAG, "SocketTimeoutException $e")
             }
-            sharingTargetViewModel.showPopup.value = true
+            imageMeasureViewModel.showPopup.value = true
         }
     }
 
@@ -103,5 +109,15 @@ class ConnectionHandler(val sharingTargetViewModel: SharingTargetViewModel) {
         else {
             Log.i("URL", "No such file ${file.absolutePath}")
         }
+    }
+
+    private fun getFilePath(uri: Uri, context: Context) : String{
+        val filePathHelper = FilePathHelper()
+        val path = if (filePathHelper.getPathnew(uri, context) != null) {
+            filePathHelper.getPathnew(uri, context).lowercase();
+        } else {
+            filePathHelper.getFilePathFromURI(uri, context).lowercase();
+        }
+        return path
     }
 }

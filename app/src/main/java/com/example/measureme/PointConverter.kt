@@ -4,13 +4,13 @@ import android.util.Log
 import androidx.compose.runtime.mutableStateOf
 
 
-class PointConverter(val imageWidth: Int, val imageHeight:Int) {
+class PointConverter(private val imageWidth: Int, val imageHeight:Int) {
     val TAG: String = "PointConverter"
     var displayWidth= mutableStateOf(0)
     var displayHeight = mutableStateOf(0)
 
     fun setDisplaySize(width: Int, height: Int) {
-        Log.i(TAG, "DISPLAY SIZE w $width h $height")
+        Log.i(TAG, "DISPLAY SIZE w $width h $height, REAL SIZE w $imageWidth h $imageHeight")
         displayWidth.value = width
         displayHeight.value = height
     }

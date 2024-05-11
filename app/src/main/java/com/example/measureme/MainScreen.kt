@@ -1,6 +1,5 @@
 package com.example.measureme
 
-import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -11,12 +10,12 @@ import androidx.compose.runtime.Composable
 
 @Composable
 fun MainScreen(
-    sharingTargetViewModel: SharingTargetViewModel
+    imageMeasureViewModel: ImageMeasureViewModel
 ) {
     val photoPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia(),
         onResult = {uri ->
-            sharingTargetViewModel.image.value = uri
+            imageMeasureViewModel.imageUri.value = uri
         }
     )
     Column() {
@@ -27,6 +26,6 @@ fun MainScreen(
         }) {
             Text(text = "Pick a photo")
         }
-        ImageUploadFragment(sharingTargetViewModel = sharingTargetViewModel)
+        ImageUploadFragment(imageMeasureViewModel = imageMeasureViewModel)
     }
 }

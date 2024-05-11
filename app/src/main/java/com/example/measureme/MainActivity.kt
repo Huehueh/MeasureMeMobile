@@ -2,7 +2,6 @@ package com.example.measureme
 
 import android.content.Intent
 import android.os.Bundle
-import android.widget.EditText
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
@@ -15,7 +14,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -30,11 +28,11 @@ val MAIN_SCREEN = "Main screen"
 class MainActivity : ComponentActivity() {
 
 //    private val sharingTargetViewModel: SharingTargetViewModel by viewModels{SharingTargetViewModelFactory(this, intent.extras)}
-    private val sharingTargetViewModel: SharingTargetViewModel by viewModels()
+    private val imageMeasureViewModel: ImageMeasureViewModel by viewModels()
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         intent.parseSharedContent()?.let {
-            sharingTargetViewModel.setImage(it)
+            imageMeasureViewModel.imageUri.value = it
         }
         setContent {
             MeasureMeTheme {
@@ -45,7 +43,7 @@ class MainActivity : ComponentActivity() {
                     val navController = rememberNavController()
                     Navigation(
                         navController = navController,
-                        sharingTargetViewModel = sharingTargetViewModel
+                        imageMeasureViewModel = imageMeasureViewModel
                     )
                 }
             }
@@ -56,18 +54,18 @@ class MainActivity : ComponentActivity() {
     @Composable
     fun Navigation(
         navController: NavHostController,
-        sharingTargetViewModel: SharingTargetViewModel
+        imageMeasureViewModel: ImageMeasureViewModel
     ) {
         Column() {
             TextField(
-                value = sharingTargetViewModel.serverAddress.value,
-                onValueChange = { sharingTargetViewModel.serverAddress.value = it },
+                value = imageMeasureViewModel.serverAddress,
+                onValueChange = { imageMeasureViewModel.serverAddress = it },
                 label = { Text(text = "IP serwera") }
             )
             NavHost(navController = navController, startDestination = MAIN_SCREEN) {
                 composable(MAIN_SCREEN) {
                     MainScreen(
-                        sharingTargetViewModel = sharingTargetViewModel
+                        imageMeasureViewModel = imageMeasureViewModel
                     )
 
                 }
@@ -80,7 +78,7 @@ class MainActivity : ComponentActivity() {
                         }
                     )
                 ) {
-                    ImageUploadFragment(sharingTargetViewModel = sharingTargetViewModel)
+                    ImageUploadFragment(imageMeasureViewModel = imageMeasureViewModel)
                 }
             }
         }
